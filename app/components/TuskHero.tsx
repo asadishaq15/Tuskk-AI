@@ -4,13 +4,10 @@ import { useRef, useMemo, useEffect, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-// ─── Config ───────────────────────────────────────────────────────────────────
 const PARTICLE_COUNT  = 18000
 const TEXT_PARTICLES  = 8000
 const PARTICLE_SIZE   = 0.025
 const SCATTER_RADIUS  = 25
-const GATHER_DURATION = 3.5
-const GATHER_DELAY    = 0.8
 const TWINKLE_SPEED   = 2.5
 
 const easeInOutQuart = (t: number) => t < 0.5 ? 8*t*t*t*t : 1 - Math.pow(-2*t+2, 4) / 2
@@ -49,12 +46,12 @@ function getTextPoints(text: string, count: number, width: number, height: numbe
   return positions
 }
 
-// ─── Particles ────────────────────────────────────────────────────────────────
+const scrollRef = { current: 0 }
+
 function Particles() {
   const pointsRef = useRef<THREE.Points>(null)
   const geoRef    = useRef<THREE.BufferGeometry>(null)
-  const startTime = useRef<number | null>(null)
-  const gathered  = useRef(false)
+  const smoothProgress = useRef(0)
 
   const textTargets = useMemo(() => {
     if (typeof document === 'undefined') return new Float32Array(TEXT_PARTICLES * 3)
@@ -97,25 +94,24 @@ function Particles() {
     const geo = geoRef.current, pts = pointsRef.current
     if (!geo || !pts) return
     const now = clock.getElapsedTime()
-    if (startTime.current === null) startTime.current = now
-    const elapsed = now - startTime.current - GATHER_DELAY
     const mat = pts.material as THREE.PointsMaterial
-    mat.opacity = Math.min((now - startTime.current) / 1.0, 1) ** 2
+    mat.opacity = Math.min(now / 1.0, 1) ** 2
+
+    smoothProgress.current += (scrollRef.current - smoothProgress.current) * 0.08
 
     const posArr = geo.attributes.position.array as Float32Array
     const colArr = geo.attributes.color.array as Float32Array
     const sizeArr = geo.attributes.size.array as Float32Array
 
-    if (elapsed > 0) {
-      const rawT = Math.min(elapsed / GATHER_DURATION, 1)
-      for (let i = 0; i < TEXT_PARTICLES; i++) {
-        const lt = Math.max(0, Math.min((rawT - stagger[i]) / (1 - stagger[i]), 1))
-        const e = easeInOutQuart(lt)
-        posArr[i*3]   = scatterPos[i*3]   + (textTargets[i*3]   - scatterPos[i*3])   * e
-        posArr[i*3+1] = scatterPos[i*3+1] + (textTargets[i*3+1] - scatterPos[i*3+1]) * e
-        posArr[i*3+2] = scatterPos[i*3+2] + (textTargets[i*3+2] - scatterPos[i*3+2]) * e
-      }
-      if (rawT >= 1) gathered.current = true
+    const rawT = Math.max(0, Math.min(smoothProgress.current, 1))
+    const gathered = rawT >= 0.95
+
+    for (let i = 0; i < TEXT_PARTICLES; i++) {
+      const lt = Math.max(0, Math.min((rawT - stagger[i] * 0.3) / (1 - stagger[i] * 0.3), 1))
+      const e = easeInOutQuart(lt)
+      posArr[i*3]   = scatterPos[i*3]   + (textTargets[i*3]   - scatterPos[i*3])   * e
+      posArr[i*3+1] = scatterPos[i*3+1] + (textTargets[i*3+1] - scatterPos[i*3+1]) * e
+      posArr[i*3+2] = scatterPos[i*3+2] + (textTargets[i*3+2] - scatterPos[i*3+2]) * e
     }
 
     for (let i = TEXT_PARTICLES; i < PARTICLE_COUNT; i++) {
@@ -125,7 +121,7 @@ function Particles() {
       posArr[i*3+2] = scatterPos[i*3+2] + Math.sin(p*1.3) * 0.01
     }
 
-    if (gathered.current) {
+    if (gathered) {
       for (let i = 0; i < TEXT_PARTICLES; i++) {
         const tw = 0.7 + Math.sin(now*TWINKLE_SPEED + i*0.47)*0.3
         const base = 0.7 + (i%100)/100*0.3
@@ -163,77 +159,104 @@ function CameraDrift() {
   return null
 }
 
-// ─── Hero Section Export ──────────────────────────────────────────────────────
 export default function TuskHero() {
   const [ready, setReady] = useState(false)
+  const [textVisible, setTextVisible] = useState(false)
+  const sectionRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 400)
     return () => clearTimeout(t)
   }, [])
 
+  useEffect(() => {
+    const onScroll = () => {
+      const el = sectionRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const sectionHeight = el.offsetHeight - window.innerHeight
+      if (sectionHeight <= 0) return
+      const scrolled = -rect.top
+      const progress = Math.max(0, Math.min(scrolled / sectionHeight, 1))
+      scrollRef.current = progress
+      setTextVisible(progress > 0.65)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
-    <section id="hero" className="relative w-full h-screen overflow-hidden" style={{ background: '#020008' }}>
-      <Canvas
-        camera={{ position: [0, 0, 8], fov: 50 }}
-        gl={{ antialias: true, toneMapping: THREE.NoToneMapping }}
-        className="!absolute inset-0"
-      >
-        <color attach="background" args={['#020008']} />
-        <Particles />
-        <CameraDrift />
-      </Canvas>
+    <section ref={sectionRef} id="hero" className="relative w-full" style={{ height: '250vh', background: '#020008' }}>
+      <div className="sticky top-0 w-full h-screen overflow-hidden">
+        <Canvas
+          camera={{ position: [0, 0, 8], fov: 50 }}
+          gl={{ antialias: true, toneMapping: THREE.NoToneMapping }}
+          className="absolute! inset-0"
+        >
+          <color attach="background" args={['#020008']} />
+          <Particles />
+          <CameraDrift />
+        </Canvas>
 
-      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between">
-        {/* Nav */}
-        <nav className="flex items-center justify-between px-8 py-5 pointer-events-auto z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">T</span>
-            </div>
-            <span className="font-mono text-[10px] tracking-[5px] font-semibold uppercase" style={{ color:'rgba(167,139,250,0.8)' }}>
-              Tusk AI
-            </span>
-          </div>
-          <div className="hidden md:flex gap-8">
-            {['Platform', 'Solutions', 'Pricing', 'About'].map(item => (
-              <span key={item} className="font-mono text-[9px] tracking-[3px] uppercase cursor-pointer transition-colors duration-200 hover:text-violet-300"
-                style={{ color:'rgba(167,139,250,0.35)' }}>{item}</span>
-            ))}
-          </div>
-          <a href="#architecture" className="px-5 py-2 border rounded-md text-[9px] tracking-[3px] uppercase font-mono cursor-pointer transition-all duration-200 hover:bg-violet-500/10 hover:text-violet-300 pointer-events-auto"
-            style={{ borderColor:'rgba(167,139,250,0.4)', color:'rgba(167,139,250,0.7)', background:'transparent' }}>
-            Get Started
-          </a>
-        </nav>
-
-        {/* Headline + CTA */}
-        <div className="flex flex-col items-center pb-20 z-10 px-6" style={{
-          opacity: ready ? 1 : 0,
-          transform: ready ? 'translateY(0)' : 'translateY(24px)',
-          transition: 'all 1.8s cubic-bezier(0.16, 1, 0.3, 1) 3.5s',
+        {/* Scroll hint */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 pointer-events-none" style={{
+          opacity: ready && !textVisible ? 1 : 0,
+          transition: 'opacity 0.6s',
         }}>
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center leading-tight mb-5 max-w-3xl"
-            style={{ color:'#ede9fe', textShadow:'0 0 80px rgba(109,40,217,0.2)' }}>
-            Stop managing workflows.{' '}
-            <span style={{ background:'linear-gradient(95deg, #c084fc, #818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
-              Let AI orchestrate them.
-            </span>
-          </h1>
-          <p className="text-sm md:text-base leading-7 max-w-xl text-center mb-10"
-            style={{ color:'rgba(196,181,253,0.45)' }}>
-            Tusk AI replaces repetitive operational work with intelligent automation pipelines
-            that learn, adapt, and execute — so you can focus on what matters.
-          </p>
-          <a href="#architecture" className="pointer-events-auto px-8 py-3.5 rounded-md text-[10px] tracking-[4px] uppercase font-mono cursor-pointer transition-all duration-300 hover:shadow-[0_0_40px_rgba(109,40,217,0.3)]"
-            style={{
-              background:'linear-gradient(135deg, #7c3aed, #6d28d9)',
-              border:'1px solid rgba(167,139,250,0.5)',
-              color:'#fff',
-              boxShadow:'0 0 24px rgba(109,40,217,0.25)',
-            }}>
-            Initiate a Workflow Audit
-          </a>
+          <span className="font-mono text-[8px] tracking-[5px] uppercase" style={{ color: 'rgba(167,139,250,0.4)' }}>Scroll to reveal</span>
+          <div className="w-px h-8 animate-pulse" style={{ background: 'linear-gradient(to bottom, rgba(167,139,250,0.4), transparent)' }} />
+        </div>
+
+        <div className="absolute inset-0 pointer-events-none flex flex-col justify-between">
+          <nav className="flex items-center justify-between px-8 py-5 pointer-events-auto z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">T</span>
+              </div>
+              <span className="font-mono text-[10px] tracking-[5px] font-semibold uppercase" style={{ color:'rgba(167,139,250,0.8)' }}>
+                Tusk AI
+              </span>
+            </div>
+            <div className="hidden md:flex gap-8">
+              {['Platform', 'Solutions', 'Pricing', 'About'].map(item => (
+                <span key={item} className="font-mono text-[9px] tracking-[3px] uppercase cursor-pointer transition-colors duration-200 hover:text-violet-300"
+                  style={{ color:'rgba(167,139,250,0.35)' }}>{item}</span>
+              ))}
+            </div>
+            <a href="#architecture" className="px-5 py-2 border rounded-md text-[9px] tracking-[3px] uppercase font-mono cursor-pointer transition-all duration-200 hover:bg-violet-500/10 hover:text-violet-300 pointer-events-auto"
+              style={{ borderColor:'rgba(167,139,250,0.4)', color:'rgba(167,139,250,0.7)', background:'transparent' }}>
+              Get Started
+            </a>
+          </nav>
+
+          <div className="flex flex-col items-center pb-20 z-10 px-6" style={{
+            opacity: textVisible ? 1 : 0,
+            transform: textVisible ? 'translateY(0)' : 'translateY(30px)',
+            transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center leading-tight mb-5 max-w-3xl"
+              style={{ color:'#ede9fe', textShadow:'0 0 80px rgba(109,40,217,0.2)' }}>
+              Stop managing workflows.{' '}
+              <span style={{ background:'linear-gradient(95deg, #c084fc, #818cf8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>
+                Let AI orchestrate them.
+              </span>
+            </h1>
+            <p className="text-sm md:text-base leading-7 max-w-xl text-center mb-10"
+              style={{ color:'rgba(196,181,253,0.45)' }}>
+              Tusk AI replaces repetitive operational work with intelligent automation pipelines
+              that learn, adapt, and execute — so you can focus on what matters.
+            </p>
+            <a href="#architecture" className="pointer-events-auto px-8 py-3.5 rounded-md text-[10px] tracking-[4px] uppercase font-mono cursor-pointer transition-all duration-300 hover:shadow-[0_0_40px_rgba(109,40,217,0.3)]"
+              style={{
+                background:'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                border:'1px solid rgba(167,139,250,0.5)',
+                color:'#fff',
+                boxShadow:'0 0 24px rgba(109,40,217,0.25)',
+              }}>
+              Initiate a Workflow Audit
+            </a>
+          </div>
         </div>
       </div>
     </section>
