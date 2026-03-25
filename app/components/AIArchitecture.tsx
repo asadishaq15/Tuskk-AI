@@ -130,10 +130,6 @@ export default function AIArchitecture() {
       style={{ background: '#020008', width: '100%', minHeight: '100vh' }}
     >
       <div className="w-full h-screen overflow-hidden flex flex-col justify-center">
-        <div className="absolute inset-0 pointer-events-none" style={{
-          backgroundImage: 'linear-gradient(rgba(167,139,250,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(167,139,250,0.03) 1px, transparent 1px)',
-          backgroundSize: '80px 80px',
-        }} />
 
         {/* Step indicator */}
         <div className="absolute right-6 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2" style={{
