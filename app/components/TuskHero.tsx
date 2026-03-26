@@ -4,7 +4,7 @@ import { useRef, useMemo, useEffect, useState, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const PARTICLE_COUNT = 3000
+const PARTICLE_COUNT = 4000
 const BG_COLOR = '#020008'
 
 const easeInOutCubic = (t: number) =>
@@ -24,8 +24,8 @@ function getTextPoints(text: string, count: number, width: number, height: numbe
   const imageData = ctx.getImageData(0, 0, width, height)
   const pixels = imageData.data
   const filled: [number, number][] = []
-  for (let y = 0; y < height; y += 2)
-    for (let x = 0; x < width; x += 2)
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
       if (pixels[(y * width + x) * 4 + 3] > 128) filled.push([x, y])
   const positions = new Float32Array(count * 3)
   const sx = 4.5 / width, sy = 1.8 / height
@@ -39,6 +39,7 @@ function getTextPoints(text: string, count: number, width: number, height: numbe
 }
 
 const scrollProgress = { value: 0 }
+const mouseWorld = { x: 0, y: 0 }
 
 function gauss() {
   let u = 0, v = 0
@@ -47,18 +48,15 @@ function gauss() {
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v)
 }
 
-// Active Theory style color palette — rich RGB shades
-const AT_COLORS = [
-  [0.95, 0.35, 0.55],  // hot pink
-  [0.85, 0.25, 0.65],  // magenta
-  [0.30, 0.85, 0.75],  // teal
-  [0.20, 0.70, 0.90],  // cyan
-  [0.95, 0.75, 0.20],  // gold
-  [0.90, 0.55, 0.15],  // amber
-  [0.40, 0.90, 0.40],  // green
-  [0.65, 0.35, 0.95],  // purple
-  [0.95, 0.50, 0.30],  // orange
-  [0.35, 0.55, 0.95],  // blue
+const AT_COLORS: [number, number, number][] = [
+  [1.0, 1.0, 1.0],     // white (primary)
+  [1.0, 1.0, 1.0],     // white
+  [1.0, 1.0, 1.0],     // white
+  [1.0, 1.0, 1.0],     // white
+  [0.95, 0.80, 0.30],  // gold
+  [1.0, 0.85, 0.40],   // warm gold
+  [0.90, 0.70, 0.20],  // deep gold
+  [0.85, 0.75, 0.35],  // amber gold
 ]
 
 function createBubbleTexture(): THREE.CanvasTexture {
@@ -100,6 +98,7 @@ function Particles() {
 
   const data = useMemo(() => {
     const startPos = new Float32Array(PARTICLE_COUNT * 3)
+    const baseColors = new Float32Array(PARTICLE_COUNT * 3)
     const colors = new Float32Array(PARTICLE_COUNT * 3)
     const sizes = new Float32Array(PARTICLE_COUNT)
     const reveal = new Float32Array(PARTICLE_COUNT)
@@ -107,33 +106,38 @@ function Particles() {
     const orbitRadius = new Float32Array(PARTICLE_COUNT)
     const orbitSpeed = new Float32Array(PARTICLE_COUNT)
     const orbitY = new Float32Array(PARTICLE_COUNT)
+    const blinkPhase = new Float32Array(PARTICLE_COUNT)
+    const isGold = new Uint8Array(PARTICLE_COUNT)
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      // Start: Gaussian cluster in center
       startPos[i * 3] = gauss() * 0.6
       startPos[i * 3 + 1] = gauss() * 0.8 - 0.3
       startPos[i * 3 + 2] = (Math.random() - 0.5) * 0.4
 
-      // Orbit params: each particle spirals out to a unique radius/angle
       orbitAngle[i] = Math.random() * Math.PI * 2
-      orbitRadius[i] = 0.8 + Math.random() * 2.0
-      orbitSpeed[i] = 0.5 + Math.random() * 0.7
-      orbitY[i] = (Math.random() - 0.5) * 1.6
+      orbitRadius[i] = 1.5 + Math.random() * 4.0
+      orbitSpeed[i] = 0.08 + Math.random() * 0.12
+      orbitY[i] = (Math.random() - 0.5) * 3.5
 
       reveal[i] = Math.random()
+      blinkPhase[i] = Math.random() * Math.PI * 2
 
       const sizeRand = Math.random()
-      if (sizeRand < 0.5) sizes[i] = 0.06 + Math.random() * 0.06
-      else if (sizeRand < 0.85) sizes[i] = 0.12 + Math.random() * 0.1
-      else sizes[i] = 0.22 + Math.random() * 0.15
+      if (sizeRand < 0.5) sizes[i] = 0.08 + Math.random() * 0.07
+      else if (sizeRand < 0.85) sizes[i] = 0.15 + Math.random() * 0.1
+      else sizes[i] = 0.25 + Math.random() * 0.12
 
       const baseColor = AT_COLORS[Math.floor(Math.random() * AT_COLORS.length)]
+      isGold[i] = baseColor[0] > 0.88 && baseColor[1] < 0.9 && baseColor[2] < 0.5 ? 1 : 0
       const variation = 0.85 + Math.random() * 0.3
-      colors[i * 3] = Math.min(1, baseColor[0] * variation)
-      colors[i * 3 + 1] = Math.min(1, baseColor[1] * variation)
-      colors[i * 3 + 2] = Math.min(1, baseColor[2] * variation)
+      baseColors[i * 3] = Math.min(1, baseColor[0] * variation)
+      baseColors[i * 3 + 1] = Math.min(1, baseColor[1] * variation)
+      baseColors[i * 3 + 2] = Math.min(1, baseColor[2] * variation)
+      colors[i * 3] = baseColors[i * 3]
+      colors[i * 3 + 1] = baseColors[i * 3 + 1]
+      colors[i * 3 + 2] = baseColors[i * 3 + 2]
     }
-    return { startPos, colors, sizes, reveal, orbitAngle, orbitRadius, orbitSpeed, orbitY }
+    return { startPos, baseColors, colors, sizes, reveal, orbitAngle, orbitRadius, orbitSpeed, orbitY, blinkPhase, isGold }
   }, [])
 
   const geo = useMemo(() => {
@@ -161,14 +165,13 @@ function Particles() {
         varying vec3 vColor;
         varying float vSize;
         void main() {
-          // Blend color toward bright white when forming text
-          vec3 textColor = vec3(0.85, 0.82, 1.0);
+          vec3 textColor = vec3(1.0, 1.0, 1.0);
           vColor = mix(color, textColor, uTextMix);
           vSize = size;
           vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-          // Shrink particles when forming text so letters are crisp
-          float textShrink = mix(1.0, 0.45, uTextMix);
-          gl_PointSize = size * uScale * textShrink * (300.0 / -mvPos.z);
+          float normalSize = size * uScale * (300.0 / -mvPos.z);
+          float textSize = 0.04 * uScale * (300.0 / -mvPos.z);
+          gl_PointSize = mix(normalSize, textSize, uTextMix);
           gl_Position = projectionMatrix * mvPos;
         }
       `,
@@ -180,11 +183,14 @@ function Particles() {
         varying float vSize;
         void main() {
           vec4 tex = texture2D(uTexture, gl_PointCoord);
-          float alpha = tex.a * uOpacity;
+          float dist = length(gl_PointCoord - vec2(0.5));
+          float hardDot = smoothstep(0.5, 0.35, dist);
+          float bubbleAlpha = tex.a * uOpacity;
           float sizeAlpha = mix(1.0, 0.4, smoothstep(0.05, 0.2, vSize));
-          // When forming text, make particles more solid (less glass, more opaque core)
-          float textBoost = mix(sizeAlpha, 1.0, uTextMix * 0.7);
-          gl_FragColor = vec4(vColor * tex.rgb, alpha * textBoost);
+          float normalAlpha = bubbleAlpha * sizeAlpha;
+          float textAlpha = hardDot * 0.95;
+          float finalAlpha = mix(normalAlpha, textAlpha, uTextMix);
+          gl_FragColor = vec4(vColor, finalAlpha);
         }
       `,
       transparent: true,
@@ -197,9 +203,11 @@ function Particles() {
     const pts = pointsRef.current
     if (!pts) return
     const posAttr = geo.getAttribute('position') as THREE.BufferAttribute
-    if (!posAttr) return
+    const colAttr = geo.getAttribute('color') as THREE.BufferAttribute
+    if (!posAttr || !colAttr) return
     const now = clock.getElapsedTime()
     const arr = posAttr.array as Float32Array
+    const colArr = colAttr.array as Float32Array
 
     if (fadeStart.current < 0) fadeStart.current = now
     const fadeT = Math.min((now - fadeStart.current) / 2.0, 1)
@@ -207,12 +215,10 @@ function Particles() {
     const scroll = scrollProgress.value
     const visibleThreshold = Math.min(0.3 + scroll * 1.75, 1.0)
 
-    // Phase 1: scroll 0→0.45 = particles spiral outward in circular orbit
-    // Phase 2: scroll 0.45→1.0 = orbiting particles converge to TUSK AI
     const orbitE = easeInOutCubic(Math.min(scroll / 0.45, 1))
     const textE = easeInOutCubic(Math.max(0, (scroll - 0.45) / 0.55))
 
-    const { startPos, reveal, orbitAngle, orbitRadius, orbitSpeed, orbitY } = data
+    const { startPos, baseColors, reveal, orbitAngle, orbitRadius, orbitSpeed, orbitY, blinkPhase, isGold } = data
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3
@@ -222,33 +228,51 @@ function Particles() {
         continue
       }
 
-      // Circular orbit position — spins around center, radius grows with scroll
       const angle = orbitAngle[i] + now * orbitSpeed[i]
       const r = orbitRadius[i] * orbitE
       const ox = Math.cos(angle) * r
       const oy = orbitY[i] * orbitE
-      const oz = Math.sin(angle) * r * 0.4
+      const oz = Math.sin(angle) * r * 0.6
 
-      // Lerp: start → orbit
       const cx = startPos[i3] + (ox - startPos[i3]) * orbitE
       const cy = startPos[i3 + 1] + (oy - startPos[i3 + 1]) * orbitE
       const cz = startPos[i3 + 2] + (oz - startPos[i3 + 2]) * orbitE
 
-      // Lerp: orbit → text
       const tx = textTargets[i3], ty = textTargets[i3 + 1], tz = textTargets[i3 + 2]
       const fx = cx + (tx - cx) * textE
       const fy = cy + (ty - cy) * textE
       const fz = cz + (tz - cz) * textE
 
-      const d = (1 - textE) * 0.03
-      arr[i3] = fx + Math.sin(now * 0.9 + i * 0.3) * d
-      arr[i3 + 1] = fy + Math.cos(now * 0.7 + i * 0.4) * d
+      const d = 0.03 * (1 - textE)
+      let px = fx + Math.sin(now * 0.9 + i * 0.3) * d
+      let py = fy + Math.cos(now * 0.7 + i * 0.4) * d
+
+      const mdx = px - mouseWorld.x
+      const mdy = py - mouseWorld.y
+      const mDist = Math.sqrt(mdx * mdx + mdy * mdy)
+      const repulseR = 0.8
+      if (mDist < repulseR && mDist > 0.001) {
+        const force = (1 - mDist / repulseR) * 0.06
+        px += (mdx / mDist) * force
+        py += (mdy / mDist) * force
+      }
+
+      arr[i3] = px
+      arr[i3 + 1] = py
       arr[i3 + 2] = fz
+
+      if (isGold[i]) {
+        const blink = 0.5 + 0.5 * Math.sin(now * 2.5 + blinkPhase[i])
+        colArr[i3] = baseColors[i3] * blink + (1.0 - blink) * 0.15
+        colArr[i3 + 1] = baseColors[i3 + 1] * blink + (1.0 - blink) * 0.12
+        colArr[i3 + 2] = baseColors[i3 + 2] * blink + (1.0 - blink) * 0.05
+      }
     }
     posAttr.needsUpdate = true
+    colAttr.needsUpdate = true
 
-    shaderMat.uniforms.uOpacity.value = fadeT * (0.45 + orbitE * 0.4)
-    shaderMat.uniforms.uScale.value = 1.2 + orbitE * 0.3
+    shaderMat.uniforms.uOpacity.value = fadeT * 0.65
+    shaderMat.uniforms.uScale.value = 1.3
     shaderMat.uniforms.uTextMix.value = textE
   })
 
@@ -258,10 +282,47 @@ function Particles() {
 }
 
 
-function WaveButton() {
+function SineWave({ active }: { active: boolean }) {
+  const flat = "M0 10 L32 10"
+  const wave1a = "M0 10 Q4 2, 8 10 Q12 18, 16 10 Q20 2, 24 10 Q28 18, 32 10"
+  const wave1b = "M0 10 Q4 18, 8 10 Q12 2, 16 10 Q20 18, 24 10 Q28 2, 32 10"
+  const wave2a = "M0 10 Q4 4, 8 10 Q12 16, 16 10 Q20 4, 24 10 Q28 16, 32 10"
+  const wave2b = "M0 10 Q4 16, 8 10 Q12 4, 16 10 Q20 16, 24 10 Q28 4, 32 10"
+
+  return (
+    <svg width="32" height="20" viewBox="0 0 32 20" fill="none">
+      <path
+        d={active ? wave1a : flat}
+        stroke="rgba(255,255,255,0.6)"
+        strokeWidth="1.5"
+        fill="none"
+        strokeLinecap="round"
+        style={{ animation: active ? 'waveWhite 1.2s ease-in-out infinite alternate' : 'none', transition: 'd 0.4s ease' }}
+      />
+      <path
+        d={active ? wave2a : flat}
+        stroke="rgba(212,175,55,0.5)"
+        strokeWidth="1.2"
+        fill="none"
+        strokeLinecap="round"
+        style={{ animation: active ? 'waveGold 1.4s ease-in-out infinite alternate' : 'none', transition: 'd 0.4s ease' }}
+      />
+      <style>{`
+        @keyframes waveWhite {
+          0% { d: path("${wave1a}"); }
+          100% { d: path("${wave1b}"); }
+        }
+        @keyframes waveGold {
+          0% { d: path("${wave2a}"); }
+          100% { d: path("${wave2b}"); }
+        }
+      `}</style>
+    </svg>
+  )
+}
+
+function NavPill() {
   const [active, setActive] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animRef = useRef(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const toggle = useCallback(() => {
@@ -278,57 +339,35 @@ function WaveButton() {
     setActive(!active)
   }, [active])
 
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    const w = canvas.width, h = canvas.height
-    ctx.clearRect(0, 0, w, h)
-
-    const now = Date.now() * 0.005
-    const bars = 5
-    const barW = 2
-    const gap = 2
-    const totalW = bars * barW + (bars - 1) * gap
-    const startX = (w - totalW) / 2
-    const cy = h / 2
-    const maxH = h * 0.7
-
-    for (let b = 0; b < bars; b++) {
-      const phase = b * 1.2 + now
-      const barH = active
-        ? maxH * (0.3 + 0.35 * Math.sin(phase) + 0.2 * Math.sin(phase * 1.6 + b * 0.5))
-        : 3
-      const x = startX + b * (barW + gap)
-      ctx.beginPath()
-      ctx.roundRect(x, cy - barH / 2, barW, Math.max(barH, 2), 1)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
-      ctx.fill()
-    }
-
-    animRef.current = requestAnimationFrame(draw)
-  }, [active])
-
   useEffect(() => {
-    animRef.current = requestAnimationFrame(draw)
-    return () => cancelAnimationFrame(animRef.current)
-  }, [draw])
-
-  useEffect(() => {
-    return () => {
-      audioRef.current?.pause()
-    }
+    return () => { audioRef.current?.pause() }
   }, [])
 
   return (
-    <button
-      onClick={toggle}
-      className="fixed top-4 right-24 z-[9999] w-16 h-16 flex items-center justify-center cursor-pointer transition-opacity duration-300 hover:opacity-100"
-      style={{ background: 'none', border: 'none', padding: 0, opacity: 0.85 }}
-      title="Toggle Music"
-    >
-      <canvas ref={canvasRef} width={38} height={38} className="pointer-events-none" />
-    </button>
+
+    <div className="absolute top-8 left-[85%] flex items-center rounded-full" style={{
+      border: '1px solid rgba(255,255,255,0.15)',
+      background: 'rgba(255,255,255,0.04)',
+      padding: '5px 8px',
+      gap: 6,
+    }}>
+      <a href="#work" className="font-mono text-[9px] tracking-[4px] uppercase px-5 py-2 rounded-full transition-all duration-300 hover:bg-white/10"
+        style={{ color: 'rgba(255,255,255,0.55)' }}>
+        Work
+      </a>
+      <button
+        onClick={toggle}
+        className="mx-2 px-3 py-1 flex items-center justify-center cursor-pointer rounded-full transition-all duration-300 hover:bg-white/10"
+        style={{ background: 'none', border: 'none' }}
+        title="Toggle Music"
+      >
+        <SineWave active={active} />
+      </button>
+      <a href="#contact" className="font-mono text-[9px] tracking-[4px] uppercase px-5 py-2 rounded-full transition-all duration-300 hover:bg-white/10"
+        style={{ color: 'rgba(255,255,255,0.55)' }}>
+        Contact
+      </a>
+    </div>
   )
 }
 
@@ -340,6 +379,20 @@ export default function TuskHero() {
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 400)
     return () => clearTimeout(t)
+  }, [])
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const x = (e.clientX / window.innerWidth) * 2 - 1
+      const y = -(e.clientY / window.innerHeight) * 2 + 1
+      const fov = 52 * (Math.PI / 180)
+      const aspect = window.innerWidth / window.innerHeight
+      const z = 3.8
+      mouseWorld.x = x * Math.tan(fov / 2) * aspect * z
+      mouseWorld.y = y * Math.tan(fov / 2) * z
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
   }, [])
 
   useEffect(() => {
@@ -382,7 +435,7 @@ export default function TuskHero() {
           </div>
 
           <div className="absolute inset-0 pointer-events-none flex flex-col justify-between">
-            <nav className="flex items-center justify-between px-8 py-5 pointer-events-auto z-10">
+            <nav className="flex items-center justify-between px-8 pt-12 pointer-events-auto z-10">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
                   <span className="text-white font-bold text-sm">T</span>
@@ -391,16 +444,8 @@ export default function TuskHero() {
                   Tusk AI
                 </span>
               </div>
-              <div className="hidden md:flex gap-8">
-                {['Platform', 'Solutions', 'Pricing', 'About'].map(item => (
-                  <span key={item} className="font-mono text-[9px] tracking-[3px] uppercase cursor-pointer transition-colors duration-200 hover:text-white"
-                    style={{ color: 'rgba(255,255,255,0.35)' }}>{item}</span>
-                ))}
-              </div>
-              <a href="#architecture" className="px-5 py-2 border rounded-md text-[9px] tracking-[3px] uppercase font-mono cursor-pointer transition-all duration-200 hover:bg-white/10 hover:text-white pointer-events-auto"
-                style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)', background: 'transparent' }}>
-                Get Started
-              </a>
+
+              <NavPill />
             </nav>
 
             <div className="flex flex-col items-center pb-20 z-10 px-6" style={{
@@ -433,7 +478,6 @@ export default function TuskHero() {
         </div>
 
       </section>
-      <WaveButton />
     </>
   )
 }
