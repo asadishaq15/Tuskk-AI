@@ -102,10 +102,7 @@ function Particles() {
     const colors = new Float32Array(PARTICLE_COUNT * 3)
     const sizes = new Float32Array(PARTICLE_COUNT)
     const reveal = new Float32Array(PARTICLE_COUNT)
-    const orbitAngle = new Float32Array(PARTICLE_COUNT)
-    const orbitRadius = new Float32Array(PARTICLE_COUNT)
-    const orbitSpeed = new Float32Array(PARTICLE_COUNT)
-    const orbitY = new Float32Array(PARTICLE_COUNT)
+    const spreadPos = new Float32Array(PARTICLE_COUNT * 3)
     const blinkPhase = new Float32Array(PARTICLE_COUNT)
     const isGold = new Uint8Array(PARTICLE_COUNT)
 
@@ -114,10 +111,9 @@ function Particles() {
       startPos[i * 3 + 1] = gauss() * 0.8 - 0.3
       startPos[i * 3 + 2] = (Math.random() - 0.5) * 0.4
 
-      orbitAngle[i] = Math.random() * Math.PI * 2
-      orbitRadius[i] = 1.5 + Math.random() * 4.0
-      orbitSpeed[i] = 0.08 + Math.random() * 0.12
-      orbitY[i] = (Math.random() - 0.5) * 3.5
+      spreadPos[i * 3] = (Math.random() - 0.5) * 7.0
+      spreadPos[i * 3 + 1] = (Math.random() - 0.5) * 4.6
+      spreadPos[i * 3 + 2] = (Math.random() - 0.5) * 3.0
 
       reveal[i] = Math.random()
       blinkPhase[i] = Math.random() * Math.PI * 2
@@ -137,7 +133,7 @@ function Particles() {
       colors[i * 3 + 1] = baseColors[i * 3 + 1]
       colors[i * 3 + 2] = baseColors[i * 3 + 2]
     }
-    return { startPos, baseColors, colors, sizes, reveal, orbitAngle, orbitRadius, orbitSpeed, orbitY, blinkPhase, isGold }
+    return { startPos, spreadPos, baseColors, colors, sizes, reveal, blinkPhase, isGold }
   }, [])
 
   const geo = useMemo(() => {
@@ -215,10 +211,10 @@ function Particles() {
     const scroll = scrollProgress.value
     const visibleThreshold = Math.min(0.3 + scroll * 1.75, 1.0)
 
-    const orbitE = easeInOutCubic(Math.min(scroll / 0.45, 1))
+    const spreadE = easeInOutCubic(Math.min(scroll / 0.45, 1))
     const textE = easeInOutCubic(Math.max(0, (scroll - 0.45) / 0.55))
 
-    const { startPos, baseColors, reveal, orbitAngle, orbitRadius, orbitSpeed, orbitY, blinkPhase, isGold } = data
+    const { startPos, spreadPos, baseColors, reveal, blinkPhase, isGold } = data
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3
@@ -228,15 +224,12 @@ function Particles() {
         continue
       }
 
-      const angle = orbitAngle[i] + now * orbitSpeed[i]
-      const r = orbitRadius[i] * orbitE
-      const ox = Math.cos(angle) * r
-      const oy = orbitY[i] * orbitE
-      const oz = Math.sin(angle) * r * 0.6
-
-      const cx = startPos[i3] + (ox - startPos[i3]) * orbitE
-      const cy = startPos[i3 + 1] + (oy - startPos[i3 + 1]) * orbitE
-      const cz = startPos[i3 + 2] + (oz - startPos[i3 + 2]) * orbitE
+      const sx = spreadPos[i3]
+      const sy = spreadPos[i3 + 1]
+      const sz = spreadPos[i3 + 2]
+      const cx = startPos[i3] + (sx - startPos[i3]) * spreadE
+      const cy = startPos[i3 + 1] + (sy - startPos[i3 + 1]) * spreadE
+      const cz = startPos[i3 + 2] + (sz - startPos[i3 + 2]) * spreadE
 
       const tx = textTargets[i3], ty = textTargets[i3 + 1], tz = textTargets[i3 + 2]
       const fx = cx + (tx - cx) * textE
