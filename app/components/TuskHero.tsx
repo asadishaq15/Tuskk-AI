@@ -327,7 +327,7 @@ function NavPill() {
     if (active) {
       audioRef.current.pause()
     } else {
-      audioRef.current.play()
+      audioRef.current.play().catch(() => {})
     }
     setActive(!active)
   }, [active])

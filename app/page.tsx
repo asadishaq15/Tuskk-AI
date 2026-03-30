@@ -21,12 +21,18 @@ const GallerySection = dynamic(() => import("./components/Spinalcord"), {
   ssr: false,
 });
 
+const StarField = dynamic(() => import("./components/StarField"), {
+  ssr: false,
+});
+
 export default function Home() {
   return (
-    <main className="bg-[#020008] min-h-screen">
+    <main className="bg-[#020008] min-h-screen relative">
+      <StarField density="low" />
       <TuskHero />
       <div style={{ height: '200px', background: '#020008' }} />
       <AIArchitecture />
+      <div style={{ height: '200px', background: '#020008' }} />
       <GallerySection />         
       <div className="h-screen w-screen"></div>
     </main>
