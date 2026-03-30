@@ -12,8 +12,8 @@ const TOTAL_PLANES = 28;
 const HELIX_TURNS = 4;
 const HELIX_HEIGHT = 66;
 const HELIX_Y_START = -HELIX_HEIGHT / 2;
-const PLANE_WIDTH = 6.5;
-const PLANE_HEIGHT = 4.0;
+const PLANE_WIDTH = 8.5;
+const PLANE_HEIGHT = 6.0;
 const CORNER_RADIUS_FRAC = 0.07;
 
 const VIDEO_FILES = ["vid1.mp4", "vid2.mp4", "vid3.mp4"];
