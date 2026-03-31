@@ -148,6 +148,28 @@ export default function Home() {
     }
   }, [loaded])
 
+  useEffect(() => {
+    // Always open at top so hero particles are the first viewport.
+    if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.overflow = loaded ? "" : "hidden";
+
+    // Ensure we reveal content from the hero after loader completes.
+    if (loaded) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [loaded]);
+
   return (
     <main className="bg-[#020008] min-h-screen relative">
       {!loaded && <LoadingScreen progress={progress} onComplete={handleComplete} />}

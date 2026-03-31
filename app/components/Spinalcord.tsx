@@ -22,9 +22,6 @@ const POP_SPRING_STIFFNESS = 0.18;
 const POP_SPRING_DAMPING = 0.72;
 
 const VIDEO_FILES = ["vid1.mp4", "vid2.mp4", "vid3.mp4"];
-function getRandomVideo(): string {
-  return VIDEO_FILES[Math.floor(Math.random() * VIDEO_FILES.length)];
-}
 
 function createRoundedRectTexture(w: number, h: number, r: number): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
@@ -79,7 +76,7 @@ function captureFirstFrame(video: HTMLVideoElement): Promise<THREE.CanvasTexture
 interface VideoAsset {
   video: HTMLVideoElement;
   posterTexture: THREE.CanvasTexture;
-  liveTexture: THREE.VideoTexture;
+  liveTexture: THREE.VideoTexture | THREE.CanvasTexture;
 }
 
 function loadVideoAsset(
@@ -107,11 +104,57 @@ function loadVideoAsset(
       },
       { once: true }
     );
-    video.addEventListener("error", () =>
-      reject(new Error(`Failed to load: ${filename}`))
+    video.addEventListener(
+      "error",
+      () => reject(new Error(`Failed to load: ${filename}`)),
+      { once: true }
     );
     video.load();
   });
+}
+
+function createPlaceholderVideoAsset(): VideoAsset {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1280;
+  canvas.height = 720;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  g.addColorStop(0, "#120a22");
+  g.addColorStop(1, "#061018");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(196,181,253,0.12)";
+  ctx.font = "600 42px system-ui,sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Add /public/assets/*.mp4", canvas.width / 2, canvas.height / 2);
+
+  const posterTexture = new THREE.CanvasTexture(canvas);
+  posterTexture.minFilter = THREE.LinearFilter;
+  posterTexture.magFilter = THREE.LinearFilter;
+  posterTexture.needsUpdate = true;
+
+  const liveTexture = posterTexture.clone();
+  liveTexture.needsUpdate = true;
+
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+
+  return { video, posterTexture, liveTexture };
+}
+
+async function loadVideoAssetWithFallback(renderer: THREE.WebGLRenderer): Promise<VideoAsset> {
+  const order = [...VIDEO_FILES].sort(() => Math.random() - 0.5);
+  for (const filename of order) {
+    try {
+      return await loadVideoAsset(renderer, filename);
+    } catch {
+      console.warn(`[Spinalcord] Video unavailable: /assets/${filename}`);
+    }
+  }
+  console.warn("[Spinalcord] No videos loaded — using placeholder textures.");
+  return createPlaceholderVideoAsset();
 }
 
 interface BlockData {
@@ -120,7 +163,7 @@ interface BlockData {
   material: THREE.MeshPhongMaterial;
   video: HTMLVideoElement;
   posterTexture: THREE.CanvasTexture;
-  liveTexture: THREE.VideoTexture;
+  liveTexture: THREE.VideoTexture | THREE.CanvasTexture;
   isPlaying: boolean;
   popCurrent: number;
   popVelocity: number;
@@ -131,7 +174,7 @@ interface BlockData {
 }
 
 function activateBlock(b: BlockData) {
-  if (!b.isPlaying) {
+  if (!b.isPlaying && b.video.src) {
     b.material.map = b.liveTexture;
     b.material.needsUpdate = true;
     b.video.currentTime = 0;
@@ -184,7 +227,7 @@ async function initializeBlocks(
     const angle = t * HELIX_TURNS * Math.PI * 2;
     const y = HELIX_Y_START + t * HELIX_HEIGHT;
 
-    const asset = await loadVideoAsset(renderer, getRandomVideo());
+    const asset = await loadVideoAssetWithFallback(renderer);
     videoElements.push(asset.video);
 
     const material = new THREE.MeshPhongMaterial({

@@ -366,7 +366,10 @@ function NavPill() {
 
 export default function TuskHero() {
   const [ready, setReady] = useState(false)
-  const [textVisible, setTextVisible] = useState(false)
+  /** 0–1, same curve as particle morph into “TUSK AI” (must stay in sync with Particles useFrame). */
+  const [textFormProgress, setTextFormProgress] = useState(0)
+  // Keep headline/CTA hidden until the TUSK AI particle text is fully formed.
+  const heroCopyProgress = Math.max(0, Math.min(1, (textFormProgress - 0.9) / 0.1))
   const sectionRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -398,7 +401,9 @@ export default function TuskHero() {
       const scrolled = Math.max(0, -rect.top)
       const progress = Math.min(1, scrolled / scrollableDistance)
       scrollProgress.value = progress
-      setTextVisible(progress >= 0.85)
+      const rawText = Math.max(0, Math.min(1, (progress - 0.45) / 0.55))
+      const textE = easeInOutCubic(rawText)
+      setTextFormProgress(textE)
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
@@ -422,7 +427,7 @@ export default function TuskHero() {
 
 
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 pointer-events-none" style={{
-            opacity: ready && !textVisible ? 1 : 0,
+            opacity: ready && textFormProgress < 0.35 ? 1 : 0,
             transition: 'opacity 0.6s',
           }}>
             <span className="font-mono text-[8px] tracking-[5px] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Scroll to reveal</span>
@@ -443,20 +448,24 @@ export default function TuskHero() {
               <NavPill />
             </nav>
 
-            <div className="flex flex-col items-center pb-20 z-10 px-6" style={{
-              opacity: textVisible ? 1 : 0,
-              transform: textVisible ? 'translateY(0)' : 'translateY(30px)',
-              transition: 'all 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
-            }}>
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center leading-tight mb-5 max-w-3xl"
-                style={{ color: 'rgba(255,255,255,0.9)' }}>
+            <div
+              className="flex flex-col items-center z-10 px-6 pb-16 md:pb-20 w-full max-w-[100vw]"
+              style={{
+                opacity: heroCopyProgress,
+                transform: `translateY(${(1 - heroCopyProgress) * 28}px)`,
+                transition: 'opacity 0.55s ease, transform 0.85s cubic-bezier(0.16, 1, 0.3, 1)',
+                pointerEvents: heroCopyProgress > 0.2 ? 'auto' : 'none',
+              }}
+            >
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-center leading-snug mb-5 max-w-3xl px-2"
+                style={{ color: 'rgba(255,255,255,0.95)' }}>
                 Stop managing workflows.{' '}
-                <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+                <span style={{ color: 'rgba(255,255,255,0.62)' }}>
                   Let AI orchestrate them.
                 </span>
               </h1>
               <p className="text-sm md:text-base leading-7 max-w-xl text-center mb-10"
-                style={{ color: 'rgba(255,255,255,0.3)' }}>
+                style={{ color: 'rgba(255,255,255,0.55)' }}>
                 Tusk AI replaces repetitive operational work with intelligent automation pipelines
                 that learn, adapt, and execute — so you can focus on what matters.
               </p>
