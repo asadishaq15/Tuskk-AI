@@ -31,7 +31,6 @@ function startLoader(onProgress: (p: number) => void): void {
 }
 
 // How many "vh" the gallery section holds the user (= scroll travel inside section)
-// 400vh means 3 full screen-heights of scroll travel while stuck
 const GALLERY_SCROLL_VH = 400
 
 export default function Home() {
