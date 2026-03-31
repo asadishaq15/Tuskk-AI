@@ -407,14 +407,16 @@ export default function TuskHero() {
 
   return (
     <>
-      <section ref={sectionRef} id="hero" className="relative w-full" style={{ height: '350vh', background: BG_COLOR }}>
+      <section ref={sectionRef} id="hero" className="relative w-full" style={{ height: '350vh', 
+        // background: BG_COLOR 
+        }}>
         <div className="sticky top-0 w-full h-screen overflow-hidden">
           <Canvas
             camera={{ position: [0, 0, 3.8], fov: 52 }}
             gl={{ antialias: true, toneMapping: THREE.NoToneMapping }}
             className="absolute! inset-0"
           >
-            <color attach="background" args={[BG_COLOR]} />
+            {/* <color attach="background" args={[BG_COLOR]} /> */}
             <Particles />
           </Canvas>
 
