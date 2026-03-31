@@ -109,7 +109,7 @@ function activateBlock(b: BlockData) {
   b.material.map = b.liveTexture;
   b.material.needsUpdate = true;
   b.video.currentTime = 0;
-  b.video.play().catch(console.warn);
+  b.video.play().catch(() => {});
   b.isPlaying = true;
 }
 
