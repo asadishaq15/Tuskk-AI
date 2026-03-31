@@ -3,8 +3,7 @@
 
 import { useRef, useEffect, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { useGLTF, useAnimations } from '@react-three/fiber'  
-import { useGLTF as useGLTFDrei, useAnimations as useAnimationsDrei } from '@react-three/drei'
+import { useGLTF, useAnimations } from '@react-three/drei'
 import { useRobotScroll, RobotTarget } from './useRobotScroll'
 import * as THREE from 'three'
 
@@ -12,8 +11,8 @@ const LERP_SPEED = 4
 
 function RobotMesh({ targetRef }: { targetRef: React.MutableRefObject<RobotTarget> }) {
   const group = useRef<THREE.Group>(null!)
-  const { nodes, materials, animations } = useGLTFDrei('/robort.glb')
-  const { actions, names } = useAnimationsDrei(animations, group)
+  const { nodes, materials, animations } = useGLTF('/robort.glb')
+  const { actions, names } = useAnimations(animations, group)
 
   const currentAnim = useRef<string | null>(null)
   const pendingAnim = useRef<string | null>(null)
@@ -141,4 +140,4 @@ export default function ScrollRobot() {
   )
 }
 
-useGLTFDrei.preload('/robort.glb')
+useGLTF.preload('/robort.glb')
