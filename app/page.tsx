@@ -33,8 +33,15 @@ export default function Home() {
       <div style={{ height: '200px', background: '#020008' }} />
       <AIArchitecture />
       <div style={{ height: '200px', background: '#020008' }} />
-      <GallerySection />         
-      <div className="h-screen w-screen"></div>
+
+      {/* Tall wrapper locks scroll inside this section */}
+      <div style={{ height: '400vh', position: 'relative' }}>
+        <div style={{ position: 'sticky', top: 0, height: '100vh' }}>
+          <GallerySection />
+        </div>
+      </div>
+
+      <div className="h-screen w-screen" />
     </main>
   );
 }

@@ -8,7 +8,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 const RADIUS = 10;
 const HEIGHT = 60;
 const BASE_ROTATION_SPEED = 0.002;
-const TOTAL_PLANES = 28;
+const TOTAL_PLANES =28;
 const HELIX_TURNS = 4;
 const HELIX_HEIGHT = 66;
 const HELIX_Y_START = -HELIX_HEIGHT / 2;
@@ -181,27 +181,48 @@ function loadSpinalCord(scene: THREE.Scene): void {
   loader.load("/spinal_cord.glb", (gltf) => {
     const model = gltf.scene;
     model.position.set(-0.174, -26.361, 0.589);
-    model.scale.set(11, 11, 4.5);
+    model.scale.set(11, 11, 6.5);
+
     model.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        mesh.renderOrder = 2;  // render after planes so transmission captures them
-        mesh.material = new THREE.MeshPhysicalMaterial({
-          color: 0xff9bbf,
-          roughness: 0,
-          metalness: 0,
-          transmission: 1,
-          thickness: 1.5,
-          ior: 1.3,
-          clearcoat: 1,
-          clearcoatRoughness: 0,
-          transparent: true,
-          opacity: 1,
-        });
+        mesh.renderOrder = 2;
+
+        const isSpine = mesh.name === "Male_Skeletal_Atlas_Geo_bones_back_0";
+        const isCord  = mesh.name === "Torus002";
+
+        if (isSpine) {
+          mesh.material = new THREE.MeshPhysicalMaterial({
+            color: 0xff9bbf,       // 👈 pink for bones
+            roughness: 0,
+            metalness: 0,
+            transmission: 1,
+            thickness: 1.5,
+            ior: 1.3,
+            clearcoat: 1,
+            clearcoatRoughness: 0,
+            transparent: true,
+            opacity: 1,
+          });
+        } else if (isCord) {
+          mesh.material = new THREE.MeshPhysicalMaterial({
+            color: 0xa8d8ff,       // 👈 blue for cord
+            roughness: 1,
+            metalness: 0,
+            transmission: 1,
+            thickness: 1.5,
+            ior: 1.3,
+            clearcoat: 1,
+            clearcoatRoughness: 0,
+            transparent: true,
+            opacity: 1,
+          });
+        }
       }
     });
+
     scene.add(model);
   }, undefined, (err) => console.error("GLB load error:", err));
 }
@@ -268,13 +289,15 @@ export default function Spinalcord() {
     let rafId: number;
     const animate = () => {
       rafId = requestAnimationFrame(animate);
-
-      const rect = container.getBoundingClientRect();
-      const scrollable = container.clientHeight + window.innerHeight;
-      const scrolled = window.innerHeight - rect.top;
-      const frac = Math.min(Math.max(scrolled / scrollable, 0), 1);
-
-      camera.position.y = -(frac * HEIGHT - HEIGHT / 2);
+// AFTER — reads from the tall sticky parent:
+const stickyParent = container.closest('[data-gallery-scroll]') as HTMLElement | null;
+if (stickyParent) {
+  const rect = stickyParent.getBoundingClientRect();
+  const totalScroll = stickyParent.offsetHeight - window.innerHeight;
+  const scrolled = -rect.top;
+  const frac = Math.min(Math.max(scrolled / totalScroll, 0), 1);
+  camera.position.y = -(frac * HEIGHT - HEIGHT / 2);
+}
       galleryGroup.rotation.y += BASE_ROTATION_SPEED + rotationSpeed;
       rotationSpeed *= 0.95;
 
