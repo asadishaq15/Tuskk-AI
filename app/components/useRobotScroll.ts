@@ -118,10 +118,18 @@ export function useRobotScroll() {
       const maxScroll = doc.scrollHeight - doc.clientHeight
       const pct = maxScroll > 0 ? (window.scrollY / maxScroll) * 100 : 0
       const kf = ROBOT_KEYFRAMES
+      const galleryEl = document.querySelector('[data-gallery-scroll]') as HTMLElement | null
+      const galleryTop = galleryEl ? galleryEl.getBoundingClientRect().top : Number.POSITIVE_INFINITY
 
       let fromIdx = 0
       for (let i = kf.length - 1; i >= 0; i--) {
         if (pct >= kf[i].scrollPercent) { fromIdx = i; break }
+      }
+      const ARCH_END_PERCENT = 50
+      const clampedPct = Math.min(pct, ARCH_END_PERCENT)
+      fromIdx = 0
+      for (let i = kf.length - 1; i >= 0; i--) {
+        if (clampedPct >= kf[i].scrollPercent) { fromIdx = i; break }
       }
       const toIdx = Math.min(fromIdx + 1, kf.length - 1)
       const from = kf[fromIdx]
@@ -130,7 +138,7 @@ export function useRobotScroll() {
       let t = 0
       if (toIdx !== fromIdx) {
         const range = to.scrollPercent - from.scrollPercent
-        t = range > 0 ? (pct - from.scrollPercent) / range : 0
+        t = range > 0 ? (clampedPct - from.scrollPercent) / range : 0
         t = Math.max(0, Math.min(1, easeInOut(t)))
       }
 
@@ -144,6 +152,14 @@ export function useRobotScroll() {
       target.rotation[2] = lerp(from.rotation[2], to.rotation[2], t)
       // Only switch animation at 80% through transition to avoid rapid toggling
       target.animationName = t > 0.8 ? to.animationName : from.animationName
+
+      // Keep robot out of Spinal section.
+      // Fade out as soon as gallery reaches near viewport.
+      if (galleryTop <= window.innerHeight * 0.92) {
+        target.opacity = 0
+      } else {
+        target.opacity = 1
+      }
     }
 
    window.addEventListener('scroll', onScroll, { passive: true })

@@ -342,6 +342,8 @@ export default function Spinalcord() {
     const videoElements: HTMLVideoElement[] = [];
     let allBlocks: BlockData[] = [];
     let hoveredBlock: BlockData | null = null;
+    let hoverMissFrames = 0;
+    const HOVER_MISS_TOLERANCE = 6;
 
     const getScrollFrac = (): number => {
       const wrapper = container.closest(
@@ -433,10 +435,22 @@ export default function Spinalcord() {
           allBlocks.map((b) => b.mesh),
           false
         );
-        const hitBlock =
+        const directHit =
           hits.length > 0
             ? allBlocks.find((b) => b.mesh === hits[0].object) ?? null
             : null;
+
+        // Keep current hover stable when pointer grazes card edges.
+        // This removes the flicker/debounce feel on tilted side cards.
+        let hitBlock = directHit;
+        if (!hitBlock && hoveredBlock) {
+          hoverMissFrames += 1;
+          if (hoverMissFrames <= HOVER_MISS_TOLERANCE) {
+            hitBlock = hoveredBlock;
+          }
+        } else {
+          hoverMissFrames = 0;
+        }
 
         if (hitBlock !== hoveredBlock) {
           if (hoveredBlock) deactivateBlock(hoveredBlock);

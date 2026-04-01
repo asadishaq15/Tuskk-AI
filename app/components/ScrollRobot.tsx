@@ -33,6 +33,7 @@ function RobotMesh({ targetRef }: { targetRef: React.MutableRefObject<RobotTarge
     if (!group.current) return
     const target = targetRef.current
     const s = Math.min(1, LERP_SPEED * delta)
+    group.current.visible = target.opacity > 0.01
 
     group.current.position.x += (target.position[0] - group.current.position.x) * s
     group.current.position.y += (target.position[1] - group.current.position.y) * s
